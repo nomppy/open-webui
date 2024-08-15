@@ -1,0 +1,53 @@
+name: open-webui-dev
+
+services:
+  searxng:
+    image: searxng/searxng:latest
+    pull_policy: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng:/etc/searxng
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    environment:
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+      - SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+    restart: always
+    profiles: [search]
+
+  pipelines:
+    extends:
+      file: pipelines/compose.yaml
+      service: pipelines
+    entrypoint: ["bash", "dev.sh"]
+    env_file: ".env.dev"
+
+  OI:
+    build: Dockerfile
+    image: ghcr.io/open-webui/open-webui:main
+    pull_policy: always
+    command: ["bash", "start.sh"]
+    env_file: ".env.dev"
+    environment:
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+      - SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+    volumes:
+      - data:/app/backend/data
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "3000:8080"
+    restart: always
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app/backend
+          ignore:
+            - backend/data
+        - action: rebuild
+          path: backend/requirements.txt
+
+volumes:
+  data: {}
